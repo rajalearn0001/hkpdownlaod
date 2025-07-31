@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HKP Video Downloader - Download from YouTube, Vimeo & More</title>
+    <link rel="stylesheet" href="static/styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Loading Overlay -->
+    <div id="download-overlay" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.9); z-index:1000; text-align:center;">
+        <div style="margin-top:15vh;">
+            <!-- Jumping Balls Animation -->
+            <div class="jumping-balls">
+                <div class="ball ball1"></div>
+                <div class="ball ball2"></div>
+                <div class="ball ball3"></div>
+                <div class="ball ball4"></div>
+                <div class="ball ball5"></div>
+            </div>
+            
+            <!-- Progress Circle -->
+            <div class="progress-circle">
+                <div class="progress-circle-inner">
+                    <div id="progress-percentage">0%</div>
+                </div>
+            </div>
+            
+            <div style="color:#fff; font-size:1.8rem; margin-top:2rem; font-weight:600;">
+                Preparing your download...
+            </div>
+            <div id="download-status" style="color:#ccc; font-size:1.1rem; margin-top:0.5rem;">
+                Initializing download process
+            </div>
+            
+            <!-- Progress Bar -->
+            <div class="download-progress-bar">
+                <div id="download-progress-fill" class="download-progress-fill"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="logo">
+                <i class="fas fa-download"></i>
+                <h1>HKP Video Downloader</h1>
+            </div>
+            <p class="subtitle">Download videos and audio from YouTube, LinkedIn, Facebook, Instagram, Twitter, TikTok, and 1000+ more sites</p>
+        </div>
+
+        <div class="main-card">
+            <!-- Error/Success Messages -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="messages">
+                {% for category, message in messages %}
+                    <div class="message {{ category }}">
+                        <i class="fas fa-{% if category == 'error' %}exclamation-triangle{% else %}info-circle{% endif %}"></i>
+                        {{ message }}
+                    </div>
+                {% endfor %}
+                </div>
+            {% endif %}
+            {% endwith %}
+
+            <!-- URL Input Form -->
+            <form id="fetch-form" action="/" method="POST" class="url-form">
+                <div class="input-group">
+                                    <label for="url">
+                    <i class="fas fa-link"></i>
+                    Video URL
+                </label>
+                <input type="url" id="url" name="url" value="{{ video_url }}" placeholder="https://www.youtube.com/watch?v=... or https://linkedin.com/posts/... or https://facebook.com/..." required>
+                    <button type="submit" class="btn-primary">
+                        <i class="fas fa-search"></i>
+                        Get Video Info
+                    </button>
+                </div>
+                
+                <!-- Progress Bar -->
+                <div id="fetch-progress" style="display:none; margin-top:20px;">
+                    <div class="progress-bar">
+                        <div id="fetch-bar" class="progress-fill"></div>
+                    </div>
+                    <div id="fetch-text" class="progress-text">Fetching video info: 0%</div>
+                </div>
+            </form>
+
+            <!-- Video Information -->
+            {% if title %}
+            <div class="video-info">
+                {% if thumbnail_url %}
+                <div class="video-thumbnail">
+                    <img src="{{ thumbnail_url }}" alt="Video thumbnail" onerror="this.style.display='none'">
+                </div>
+                {% endif %}
+                
+                <div class="video-details">
+                    <h2 class="video-title">{{ title }}</h2>
+                    
+                    <!-- Download Options -->
+                    <div class="download-options">
+                        <h3><i class="fas fa-download"></i> Download Options</h3>
+                        
+                                            <!-- Video Downloads -->
+                    <form action="/download" method="POST" class="download-form">
+                        <input type="hidden" name="url" value="{{ video_url }}">
+                        <div class="format-selector">
+                            <label for="format_id">
+                                <i class="fas fa-video"></i>
+                                Choose Video Format:
+                            </label>
+                            <select name="format_id" required>
+                                {% if resolutions %}
+                                    {% for res in resolutions %}
+                                        <option value="{{ res.format_id }}">
+                                            {{ res.label }}
+                                        </option>
+                                    {% endfor %}
+                                {% else %}
+                                    <option>No available formats</option>
+                                {% endif %}
+                            </select>
+                            <small style="color: #666; font-size: 0.85rem; margin-top: 0.5rem; display: block;">
+                                💡 <strong>Tip:</strong> If you get format errors, try selecting a different format or use "Download Audio Only"
+                            </small>
+                            <small style="color: #0077b5; font-size: 0.85rem; margin-top: 0.25rem; display: block;">
+                                🔗 <strong>LinkedIn:</strong> Works with posts, company videos, and stories
+                            </small>
+                        </div>
+                        <button type="submit" class="btn-download">
+                            <i class="fas fa-download"></i>
+                            Download Video
+                        </button>
+                    </form>
+
+                        <!-- Audio Only Download -->
+                        <form action="/download" method="POST" class="download-form audio-form">
+                            <input type="hidden" name="url" value="{{ video_url }}">
+                            <input type="hidden" name="format_id" value="bestaudio">
+                            <button type="submit" class="btn-audio">
+                                <i class="fas fa-music"></i>
+                                Download Audio Only (MP3)
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Subtitle Downloads -->
+                    {% if subtitles and subtitles|length > 0 %}
+                    <div class="subtitle-options">
+                        <h3><i class="fas fa-closed-captioning"></i> Download Subtitles</h3>
+                        <form action="/download_subtitle" method="POST" class="subtitle-form">
+                            <input type="hidden" name="url" value="{{ video_url }}">
+                            <div class="subtitle-controls">
+                                <div class="select-group">
+                                    <label for="lang_code">Language:</label>
+                                    <select name="lang_code" required>
+                                        {% for sub in subtitles %}
+                                            <option value="{{ sub.lang_code }}">{{ sub.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="select-group">
+                                    <label for="sub_format">Format:</label>
+                                    <select name="sub_format" required>
+                                        <option value="srt">SRT</option>
+                                        <option value="vtt">VTT</option>
+                                        <option value="ttml">TTML</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn-subtitle">
+                                <i class="fas fa-download"></i>
+                                Download Subtitles
+                            </button>
+                        </form>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Supported Platforms Section -->
+        <div class="features">
+            <h3><i class="fas fa-share-alt"></i> Supported Platforms</h3>
+            <div class="platform-grid">
+                <div class="platform">
+                    <i class="fab fa-youtube" style="color: #ff0000;"></i>
+                    <h4>YouTube</h4>
+                    <p>Videos, Shorts, Live streams</p>
+                </div>
+                <div class="platform">
+                    <i class="fab fa-linkedin" style="color: #0077b5;"></i>
+                    <h4>LinkedIn</h4>
+                    <p>Posts, Stories, Company videos</p>
+                </div>
+                <div class="platform">
+                    <i class="fab fa-facebook" style="color: #1877f2;"></i>
+                    <h4>Facebook</h4>
+                    <p>Posts, Stories, Reels, Live</p>
+                </div>
+                <div class="platform">
+                    <i class="fab fa-instagram" style="color: #e4405f;"></i>
+                    <h4>Instagram</h4>
+                    <p>Posts, Stories, Reels, IGTV</p>
+                </div>
+                <div class="platform">
+                    <i class="fab fa-twitter" style="color: #1da1f2;"></i>
+                    <h4>Twitter</h4>
+                    <p>Tweets, Spaces, Live videos</p>
+                </div>
+                <div class="platform">
+                    <i class="fab fa-tiktok" style="color: #000000;"></i>
+                    <h4>TikTok</h4>
+                    <p>Videos, Live streams</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Features Section -->
+        <div class="features">
+            <h3><i class="fas fa-star"></i> Features</h3>
+            <div class="feature-grid">
+                <div class="feature">
+                    <i class="fas fa-globe"></i>
+                    <h4>Multiple Platforms</h4>
+                    <p>YouTube, LinkedIn, Facebook, Instagram, Twitter, TikTok</p>
+                </div>
+                <div class="feature">
+                    <i class="fas fa-video"></i>
+                    <h4>High Quality Videos</h4>
+                    <p>Download videos in various resolutions up to 4K</p>
+                </div>
+                <div class="feature">
+                    <i class="fas fa-music"></i>
+                    <h4>Audio Extraction</h4>
+                    <p>Extract audio in MP3 format from any video</p>
+                </div>
+                <div class="feature">
+                    <i class="fas fa-closed-captioning"></i>
+                    <h4>Subtitles</h4>
+                    <p>Download subtitles in multiple formats</p>
+                </div>
+                <div class="feature">
+                    <i class="fas fa-bolt"></i>
+                    <h4>Fast Downloads</h4>
+                    <p>Optimized for speed and reliability</p>
+                </div>
+                <div class="feature">
+                    <i class="fas fa-mobile-alt"></i>
+                    <h4>Mobile Friendly</h4>
+                    <p>Works perfectly on all devices</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Progress bar animation
+        let fetchInterval = null;
+        function startFakeFetchProgress() {
+            let percent = 0;
+            document.getElementById('fetch-progress').style.display = 'block';
+            document.getElementById('fetch-bar').style.width = '0%';
+            document.getElementById('fetch-text').innerText = 'Fetching video info: 0%';
+            
+            fetchInterval = setInterval(() => {
+                percent += Math.random() * 8 + 2;
+                if (percent > 98) percent = 98;
+                document.getElementById('fetch-bar').style.width = percent + '%';
+                document.getElementById('fetch-text').innerText = 'Fetching video info: ' + Math.floor(percent) + '%';
+            }, 200);
+        }
+        
+        function stopFakeFetchProgress() {
+            clearInterval(fetchInterval);
+            document.getElementById('fetch-bar').style.width = '100%';
+            document.getElementById('fetch-text').innerText = 'Fetching video info: 100%';
+            setTimeout(() => {
+                document.getElementById('fetch-progress').style.display = 'none';
+            }, 500);
+        }
+        
+        document.getElementById('fetch-form').addEventListener('submit', function() {
+            startFakeFetchProgress();
+        });
+
+        // Show overlay on download form submit with progress simulation
+        document.querySelectorAll('form[action="/download"], form[action="/download_subtitle"]').forEach(form => {
+            form.addEventListener('submit', function() {
+                document.getElementById('download-overlay').style.display = 'block';
+                simulateDownloadProgress();
+            });
+        });
+
+        // Download progress simulation
+        function simulateDownloadProgress() {
+            const progressPercentage = document.getElementById('progress-percentage');
+            const downloadStatus = document.getElementById('download-status');
+            const progressFill = document.getElementById('download-progress-fill');
+            const progressCircle = document.querySelector('.progress-circle');
+            
+            let progress = 0;
+            const statuses = [
+                'Initializing download process...',
+                'Analyzing video format...',
+                'Preparing download stream...',
+                'Starting download...',
+                'Downloading video data...',
+                'Processing audio stream...',
+                'Merging video and audio...',
+                'Finalizing download...',
+                'Download complete!'
+            ];
+            
+            const interval = setInterval(() => {
+                progress += Math.random() * 8 + 2;
+                if (progress > 98) progress = 98;
+                
+                // Update progress percentage
+                progressPercentage.textContent = Math.floor(progress) + '%';
+                
+                // Update progress circle
+                const degrees = (progress / 100) * 360;
+                progressCircle.style.background = `conic-gradient(#667eea 0deg, #667eea ${degrees}deg, #333 ${degrees}deg)`;
+                
+                // Update progress bar
+                progressFill.style.width = progress + '%';
+                
+                // Update status message
+                const statusIndex = Math.floor((progress / 100) * (statuses.length - 1));
+                downloadStatus.textContent = statuses[statusIndex];
+                
+                if (progress >= 98) {
+                    clearInterval(interval);
+                    setTimeout(() => {
+                        progressPercentage.textContent = '100%';
+                        progressFill.style.width = '100%';
+                        downloadStatus.textContent = 'Download complete!';
+                    }, 500);
+                }
+            }, 200);
+        }
+
+        // Auto-hide messages after 5 seconds
+        setTimeout(() => {
+            const messages = document.querySelectorAll('.message');
+            messages.forEach(msg => {
+                msg.style.opacity = '0';
+                setTimeout(() => msg.remove(), 300);
+            });
+        }, 5000);
+    </script>
+</body>
+</html>
