@@ -372,6 +372,7 @@ ydl_opts = {
     'format': ydl_format,
     'outtmpl': os.path.join(DOWNLOAD_DIR, '%(title)s.%(ext)s'),
     'quiet': False,  # Change to False to see output
+    'cookiefile': 'linkedin_cookies.txt',  # ← Add this line
     'noplaylist': True,
     'no_warnings': False,  # Change to False
     'ignoreerrors': False,
