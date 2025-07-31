@@ -365,7 +365,8 @@ def progress_hook(d):
         print(f"Downloading: {d.get('_percent_str', '0%')} of {d.get('_total_bytes_str', 'Unknown')}")
     elif d['status'] == 'finished':
         print(f"Download finished, now converting...")
-
+# Define the format
+ydl_format = 'bestvideo+bestaudio/best'
 # Then in your ydl_opts:
 ydl_opts = {
     'format': ydl_format,
